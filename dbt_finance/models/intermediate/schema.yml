@@ -1,0 +1,72 @@
+version: 2
+
+models:
+  - name: int_price_features
+    description: Quarter-level market features aggregated from the daily price history.
+    columns:
+      - name: company_quarter_feature_key
+        description: Unique identifier for a company-quarter market feature record.
+        tests:
+          - not_null
+          - unique
+      - name: company_id
+        description: Foreign key to the staged company dimension.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_companies')
+                field: company_id
+      - name: fiscal_quarter_start_date
+        description: First day of the fiscal quarter represented by the aggregated price metrics.
+        tests:
+          - not_null
+
+  - name: int_fundamental_ratios
+    description: Financial statement measures with ratio calculations at the company-quarter grain.
+    columns:
+      - name: company_quarter_key
+        description: Unique identifier for a company-quarter fundamental record.
+        tests:
+          - not_null
+          - unique
+      - name: company_id
+        description: Foreign key to the staged company dimension.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_companies')
+                field: company_id
+      - name: revenue_growth_qoq
+        description: Quarter-over-quarter revenue growth derived from Spark lag logic.
+
+  - name: int_company_quarterly_features
+    description: Combined company-quarter feature set built by joining market and fundamental metrics.
+    columns:
+      - name: company_quarter_key
+        description: Unique identifier for the joined company-quarter feature row.
+        tests:
+          - not_null
+          - unique
+      - name: company_id
+        description: Foreign key to the staged company dimension.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_companies')
+                field: company_id
+      - name: sector
+        description: Standardized sector carried through to the analytics layer.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - Technology
+                  - Healthcare
+                  - Industrials
+                  - Consumer Defensive
+                  - Financial Services
+                  - Energy

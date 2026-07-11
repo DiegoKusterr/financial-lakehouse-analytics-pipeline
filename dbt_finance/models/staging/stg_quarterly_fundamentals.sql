@@ -1,0 +1,21 @@
+select
+    cast(company_id as varchar) || '-' || fiscal_quarter as company_quarter_key,
+    cast(company_id as integer) as company_id,
+    fiscal_quarter,
+    cast(fiscal_quarter_start_date as date) as fiscal_quarter_start_date,
+    cast(revenue as double) as revenue,
+    cast(gross_profit as double) as gross_profit,
+    cast(operating_income as double) as operating_income,
+    cast(net_income as double) as net_income,
+    cast(total_assets as double) as total_assets,
+    cast(total_liabilities as double) as total_liabilities,
+    cast(equity as double) as equity,
+    cast(operating_cash_flow as double) as operating_cash_flow,
+    cast(previous_quarter_revenue as double) as previous_quarter_revenue,
+    cast(revenue_growth_qoq as double) as revenue_growth_qoq,
+    ticker,
+    company_name,
+    sector,
+    industry,
+    country
+from {{ source('silver', 'quarterly_fundamental_features') }}

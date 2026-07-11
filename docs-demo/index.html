@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Financial Lakehouse Analytics Pipeline | Technical Demo</title>
+  <meta
+    name="description"
+    content="Static technical demo for a local financial lakehouse pipeline built with PySpark, Parquet, dbt, DuckDB, and data quality tests."
+  >
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="hero fade-up">
+      <p class="eyebrow">Static Technical Demo</p>
+      <div class="hero-grid">
+        <div>
+          <h1>dbt documentation and lineage for a local financial lakehouse pipeline.</h1>
+          <p class="lead">Built from scratch, this project demonstrates a local financial lakehouse pipeline using PySpark for raw-to-silver ETL, Parquet for storage, and dbt with DuckDB for tested SQL transformations, lineage and analytics marts.</p>
+          <div class="actions">
+            <a class="primary-button" href="./dbt-docs/">dbt Docs & Technical Demo</a>
+            <span class="inline-note">Static site. No live dashboard. No external services.</span>
+          </div>
+        </div>
+        <aside class="hero-panel">
+          <p class="panel-label">Pipeline Summary</p>
+          <p class="panel-route">PySpark -&gt; Parquet -&gt; dbt / DuckDB</p>
+          <ul class="panel-list">
+            <li>Raw CSV generation for reproducible local inputs</li>
+            <li>Silver-layer ETL and feature engineering in Spark</li>
+            <li>dbt staging, intermediate, and mart layers</li>
+            <li>Lineage, source definitions, and tested SQL models</li>
+          </ul>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section fade-up">
+      <div class="section-heading">
+        <p class="eyebrow">What This Demo Shows</p>
+        <h2>Public documentation for the validated local pipeline run.</h2>
+      </div>
+      <div class="cards">
+        <article class="card">
+          <h3>dbt model documentation</h3>
+          <p>Staged, intermediate, and mart models are documented with descriptions, columns, and dependency context.</p>
+        </article>
+        <article class="card">
+          <h3>Model lineage and sources</h3>
+          <p>dbt Docs exposes how curated Parquet sources flow into downstream SQL layers and final marts.</p>
+        </article>
+        <article class="card">
+          <h3>Data quality visibility</h3>
+          <p>Schema tests cover record grain, null handling, controlled sector values, and referential integrity.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section fade-up">
+      <div class="section-heading">
+        <p class="eyebrow">Architecture</p>
+        <h2>Concise explanation of the technical stack.</h2>
+      </div>
+      <div class="steps">
+        <article class="step">
+          <span class="step-number">01</span>
+          <h3>PySpark raw-to-silver ETL</h3>
+          <p>Local Spark transforms raw synthetic CSV files into cleaned silver datasets with schema checks, standardization, deduplication, and window-based feature engineering.</p>
+        </article>
+        <article class="step">
+          <span class="step-number">02</span>
+          <h3>Parquet storage</h3>
+          <p>Silver outputs are written as Parquet so the pipeline keeps a clear analytical exchange layer between ETL and SQL modeling.</p>
+        </article>
+        <article class="step">
+          <span class="step-number">03</span>
+          <h3>dbt staging / intermediate / marts</h3>
+          <p>dbt organizes the DuckDB transformation layer into staging entry points, reusable intermediate logic, and analyst-facing marts.</p>
+        </article>
+        <article class="step">
+          <span class="step-number">04</span>
+          <h3>DuckDB execution</h3>
+          <p>DuckDB runs the local dbt SQL transformations over Parquet-backed sources without requiring a separate warehouse service.</p>
+        </article>
+        <article class="step">
+          <span class="step-number">05</span>
+          <h3>Data quality tests</h3>
+          <p>dbt tests validate core assumptions before the static docs are published, so the demo represents a tested pipeline rather than a mocked interface.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section fade-up">
+      <div class="section-heading">
+        <p class="eyebrow">Final Marts</p>
+        <h2>Three portfolio-facing outputs.</h2>
+      </div>
+      <div class="marts">
+        <article class="mart">
+          <h3><code>mart_company_quarterly_metrics</code></h3>
+          <p>Company-quarter financial and market metrics for downstream analysis.</p>
+        </article>
+        <article class="mart">
+          <h3><code>mart_sector_financial_health</code></h3>
+          <p>Sector-quarter rollups for margin, leverage, returns, and price behavior.</p>
+        </article>
+        <article class="mart">
+          <h3><code>mart_ml_ready_features</code></h3>
+          <p>Feature-oriented company-quarter dataset for future analytical or ML experimentation.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section fade-up">
+      <div class="section-heading">
+        <p class="eyebrow">Lineage Snapshot</p>
+        <h2>Real dbt lineage from the validated build.</h2>
+      </div>
+      <figure class="lineage-frame">
+        <img
+          src="./assets/dbt_lineage_graph.png"
+          alt="dbt lineage graph for the financial lakehouse analytics pipeline"
+        >
+        <figcaption>Source definitions feed staging models, reusable intermediate logic, and final marts documented in dbt Docs.</figcaption>
+      </figure>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,19 @@
+name: "dbt_finance"
+version: "1.0.0"
+config-version: 2
+
+profile: "finance_pipeline"
+
+model-paths: ["models"]
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+  - "logs"
+
+models:
+  dbt_finance:
+    staging:
+      +materialized: view
+    intermediate:
+      +materialized: view

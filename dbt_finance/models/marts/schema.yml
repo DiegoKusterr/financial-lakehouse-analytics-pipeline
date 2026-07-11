@@ -1,0 +1,79 @@
+version: 2
+
+models:
+  - name: mart_company_quarterly_metrics
+    description: Final company-quarter mart that combines Spark features and dbt ratio modeling.
+    columns:
+      - name: company_quarter_key
+        description: Unique identifier for a company-quarter analytics record.
+        tests:
+          - not_null
+          - unique
+      - name: company_id
+        description: Foreign key to the staged company dimension.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_companies')
+                field: company_id
+      - name: sector
+        description: Standardized sector used for downstream analytics.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - Technology
+                  - Healthcare
+                  - Industrials
+                  - Consumer Defensive
+                  - Financial Services
+                  - Energy
+
+  - name: mart_sector_financial_health
+    description: Sector-level mart summarizing financial quality and market behavior by quarter.
+    columns:
+      - name: sector_quarter_key
+        description: Unique identifier for a sector-quarter aggregate row.
+        tests:
+          - not_null
+          - unique
+      - name: sector
+        description: Sector used for aggregation.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - Technology
+                  - Healthcare
+                  - Industrials
+                  - Consumer Defensive
+                  - Financial Services
+                  - Energy
+      - name: company_count
+        description: Number of companies contributing to the sector aggregate.
+        tests:
+          - not_null
+
+  - name: mart_ml_ready_features
+    description: Feature table prepared for future machine learning experiments without training a model.
+    columns:
+      - name: company_quarter_key
+        description: Unique identifier for the company-quarter feature record.
+        tests:
+          - not_null
+          - unique
+      - name: company_id
+        description: Foreign key to the staged company dimension.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_companies')
+                field: company_id
+      - name: next_quarter_growth_flag
+        description: Simple future-growth label derived for supervised learning experiments.
+        tests:
+          - not_null

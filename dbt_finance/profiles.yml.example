@@ -1,0 +1,10 @@
+finance_pipeline:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "data/gold/finance_analytics.duckdb"
+      schema: finance
+      threads: 4
+      extensions:
+        - parquet

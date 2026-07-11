@@ -1,0 +1,83 @@
+name: Deploy Technical Demo
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Create local dbt profile
+        run: cp dbt_finance/profiles.yml.example dbt_finance/profiles.yml
+
+      - name: Generate synthetic data
+        run: python src/generate_synthetic_data.py
+
+      - name: Run PySpark ETL
+        run: python src/spark_etl.py
+
+      - name: Run dbt models
+        run: dbt run --project-dir dbt_finance --profiles-dir dbt_finance
+
+      - name: Run dbt tests
+        run: dbt test --project-dir dbt_finance --profiles-dir dbt_finance
+
+      - name: Generate dbt docs
+        run: dbt docs generate --project-dir dbt_finance --profiles-dir dbt_finance
+
+      - name: Validate outputs
+        run: python src/validate_outputs.py
+
+      - name: Build static technical demo
+        run: python src/build_technical_demo.py
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-demo
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy GitHub Pages site
+        id: deployment
+        uses: actions/deploy-pages@v4

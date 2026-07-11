@@ -1,0 +1,117 @@
+version: 2
+
+sources:
+  - name: silver
+    description: Curated Parquet datasets produced by the PySpark ETL layer.
+    tables:
+      - name: companies_clean
+        description: Cleaned company dimension written by Spark in Parquet format.
+        config:
+          external_location: "read_parquet('data/silver/companies_clean/*.parquet')"
+      - name: daily_price_features
+        description: Daily market data with Spark-generated price features.
+        config:
+          external_location: "read_parquet('data/silver/daily_price_features/*.parquet')"
+      - name: quarterly_fundamental_features
+        description: Quarterly financial statement features written by Spark in Parquet format.
+        config:
+          external_location: "read_parquet('data/silver/quarterly_fundamental_features/*.parquet')"
+
+models:
+  - name: stg_companies
+    description: Standardized company master data exposed to the dbt transformation layer.
+    columns:
+      - name: company_id
+        description: Stable identifier for each public company in the synthetic portfolio.
+        tests:
+          - not_null
+          - unique
+      - name: ticker
+        description: Uppercase stock ticker.
+        tests:
+          - not_null
+          - unique
+      - name: sector
+        description: Standardized business sector.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - Technology
+                  - Healthcare
+                  - Industrials
+                  - Consumer Defensive
+                  - Financial Services
+                  - Energy
+      - name: company_name
+        description: Human-readable company name.
+        tests:
+          - not_null
+
+  - name: stg_daily_prices
+    description: Daily stock price history enriched with rolling Spark features.
+    columns:
+      - name: daily_price_key
+        description: Unique key for a company and trading date.
+        tests:
+          - not_null
+          - unique
+      - name: company_id
+        description: Foreign key to the staged companies model.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_companies')
+                field: company_id
+      - name: price_date
+        description: Trading date for the price observation.
+        tests:
+          - not_null
+      - name: close_price
+        description: Daily closing share price after Spark cleaning.
+        tests:
+          - not_null
+      - name: sector
+        description: Sector inherited from the company dimension.
+        tests:
+          - not_null
+
+  - name: stg_quarterly_fundamentals
+    description: Quarterly company fundamentals enriched with lagged revenue features.
+    columns:
+      - name: company_quarter_key
+        description: Unique key for a company-quarter record.
+        tests:
+          - not_null
+          - unique
+      - name: company_id
+        description: Foreign key to the staged companies model.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_companies')
+                field: company_id
+      - name: fiscal_quarter
+        description: Fiscal quarter label in YYYY-QN format.
+        tests:
+          - not_null
+      - name: revenue
+        description: Quarterly revenue after missing-value treatment.
+        tests:
+          - not_null
+      - name: sector
+        description: Sector inherited from the company dimension.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - Technology
+                  - Healthcare
+                  - Industrials
+                  - Consumer Defensive
+                  - Financial Services
+                  - Energy
