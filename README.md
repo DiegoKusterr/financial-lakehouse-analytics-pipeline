@@ -21,15 +21,15 @@ The goal is to keep the scope realistic, interview-friendly, and fully runnable 
 
 ## Technical Demo
 
-This repository includes a static technical demo built around dbt Docs. It shows model documentation, lineage, sources, staging/intermediate/mart layers, tests, and the final marts in a portfolio-ready static site.
+This repository includes a static technical demo built around dbt Docs. The public technical demo opens directly into the static dbt Docs site at the overview page and shows model documentation, lineage, sources, staging/intermediate/mart layers, tests, and the final marts.
 
 This is a static technical demo, not a live dashboard or live data application.
 
-GitHub Pages URL:
+Direct dbt Docs demo URL:
 
-```text
-https://diegokusterr.github.io/financial-lakehouse-analytics-pipeline/
-```
+[dbt Docs & Technical Demo](https://diegokusterr.github.io/financial-lakehouse-analytics-pipeline/dbt-docs/#!/overview)
+
+This opens the static dbt Docs technical demo directly at the dbt overview page.
 
 Portfolio-ready description:
 
