@@ -1,4 +1,4 @@
-# Tested locally on Windows, CPython 3.11 / JDK 17. See docs/reproducibility.md.
+# Tested on Windows and Ubuntu, CPython 3.11 / JDK 17. See docs/reproducibility.md.
 # Direct dependencies and the dbt integration stack; not a full transitive lock.
 pandas==2.2.3
 numpy==2.3.4

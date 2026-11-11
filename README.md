@@ -123,6 +123,8 @@ Quality checks are applied in more than one layer:
 - `tests/` exercises the production Spark functions and actual dbt SQL with small regression fixtures
 - singular dbt tests check financial validity, consecutive-quarter relationships, publication dates, and ML labels
 
+[Ubuntu PR validation](https://github.com/DiegoKusterr/financial-lakehouse-analytics-pipeline/actions/runs/43005147062) passed all 54 Python regression cases, all 61 dbt tests, all 9 models, and complete output reconciliation with the constrained dependencies. Pull Requests run the full pipeline with read-only repository permissions. GitHub Pages deployment runs only after successful validation on a push to `main`.
+
 ## Tech Stack
 
 - Python 3.11
