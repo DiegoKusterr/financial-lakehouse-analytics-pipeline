@@ -1,0 +1,17 @@
+# Tested on Windows and Ubuntu, CPython 3.11 / JDK 17. See docs/reproducibility.md.
+# Direct dependencies and the dbt integration stack; not a full transitive lock.
+pandas==2.2.3
+numpy==2.3.4
+pyarrow==18.1.0
+pyspark==3.5.8
+py4j==0.10.9.9
+duckdb==1.5.4
+dbt-core==1.11.12
+dbt-duckdb==1.10.1
+dbt-adapters==1.24.4
+dbt-common==1.38.0
+dbt-extractor==0.6.0
+dbt-semantic-interfaces==0.9.0
+dbt-protos==1.0.541
+Jinja2==3.1.6
+pytest==8.4.2

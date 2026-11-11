@@ -10,6 +10,8 @@ select
     country,
     fiscal_quarter,
     fiscal_quarter_start_date,
+    available_date,
+    feature_available_date,
     revenue,
     previous_quarter_revenue,
     revenue_growth_qoq,

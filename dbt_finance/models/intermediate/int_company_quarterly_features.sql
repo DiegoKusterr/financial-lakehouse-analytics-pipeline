@@ -8,6 +8,8 @@ select
     fundamental_ratios.country,
     fundamental_ratios.fiscal_quarter,
     fundamental_ratios.fiscal_quarter_start_date,
+    fundamental_ratios.available_date,
+    fundamental_ratios.feature_available_date,
     fundamental_ratios.revenue,
     fundamental_ratios.gross_profit,
     fundamental_ratios.operating_income,

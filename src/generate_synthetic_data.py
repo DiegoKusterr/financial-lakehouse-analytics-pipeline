@@ -308,6 +308,8 @@ def build_quarterly_fundamentals(companies: pd.DataFrame) -> pd.DataFrame:
                 {
                     "company_id": row.company_id,
                     "fiscal_quarter": f"{quarter.year}-Q{quarter.quarter}",
+                    # Explicit synthetic publication assumption, not a real filing calendar.
+                    "available_date": (quarter.end_time.normalize() + pd.Timedelta(days=45)).strftime("%Y-%m-%d"),
                     "revenue": round(revenue, 2),
                     "gross_profit": round(gross_profit, 2),
                     "operating_income": round(operating_income, 2),

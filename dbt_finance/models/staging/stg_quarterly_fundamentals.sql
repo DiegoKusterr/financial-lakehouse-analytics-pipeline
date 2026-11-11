@@ -3,6 +3,8 @@ select
     cast(company_id as integer) as company_id,
     fiscal_quarter,
     cast(fiscal_quarter_start_date as date) as fiscal_quarter_start_date,
+    cast(available_date as date) as available_date,
+    cast(feature_available_date as date) as feature_available_date,
     cast(revenue as double) as revenue,
     cast(gross_profit as double) as gross_profit,
     cast(operating_income as double) as operating_income,
