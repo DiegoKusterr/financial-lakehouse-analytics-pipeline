@@ -2,11 +2,13 @@ PYTHON ?= python
 DBT_PROJECT_DIR ?= dbt_finance
 DBT_PROFILES_DIR ?= dbt_finance
 
-.PHONY: install generate-data spark-etl dbt-run dbt-test dbt-docs build-demo preview-demo validate clean
+.PHONY: install test generate-data spark-etl dbt-run dbt-test dbt-docs build-demo preview-demo validate clean
 
 install:
-	$(PYTHON) -m pip install --upgrade pip
-	$(PYTHON) -m pip install -r requirements.txt
+	$(PYTHON) -m pip install -r requirements-dev.txt
+
+test:
+	$(PYTHON) -m pytest tests -q
 
 generate-data:
 	$(PYTHON) src/generate_synthetic_data.py
@@ -19,6 +21,7 @@ dbt-run:
 
 dbt-test:
 	dbt test --project-dir $(DBT_PROJECT_DIR) --profiles-dir $(DBT_PROFILES_DIR)
+	$(PYTHON) -c "from pathlib import Path; import shutil; p = Path('$(DBT_PROJECT_DIR)') / 'target'; shutil.copy2(p / 'run_results.json', p / 'test_run_results.json')"
 
 dbt-docs:
 	dbt docs generate --project-dir $(DBT_PROJECT_DIR) --profiles-dir $(DBT_PROFILES_DIR)

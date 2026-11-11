@@ -3,7 +3,9 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
+from functools import reduce
 from pathlib import Path
 
 import pyspark
@@ -38,6 +40,7 @@ REQUIRED_COLUMNS = {
     "quarterly_fundamentals": {
         "company_id",
         "fiscal_quarter",
+        "available_date",
         "revenue",
         "gross_profit",
         "operating_income",
@@ -92,7 +95,9 @@ def configure_local_hadoop_home() -> None:
     temporary_hadoop_home = Path(tempfile.gettempdir()) / "financial_lakehouse_hadoop"
     temporary_bin_dir = temporary_hadoop_home / "bin"
     temporary_bin_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(winutils_path, temporary_bin_dir / "winutils.exe")
+    target = temporary_bin_dir / "winutils.exe"
+    if winutils_path.resolve() != target.resolve():
+        shutil.copy2(winutils_path, target)
 
     os.environ["HADOOP_HOME"] = str(temporary_hadoop_home)
     os.environ["hadoop.home.dir"] = str(temporary_hadoop_home)
@@ -129,12 +134,15 @@ def compile_windows_spark_support() -> Path | None:
     return classes_dir
 
 
-def build_spark_session() -> SparkSession:
+def build_spark_session(master: str = "local[*]") -> SparkSession:
     configure_local_hadoop_home()
+    os.environ.setdefault("PYSPARK_PYTHON", sys.executable)
     spark_builder = (
         SparkSession.builder.appName("financial-lakehouse-analytics-pipeline")
-        .master("local[*]")
+        .master(master)
         .config("spark.sql.session.timeZone", "UTC")
+        .config("spark.sql.ansi.enabled", "false")
+        .config("spark.sql.shuffle.partitions", "4")
         .config("spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version", "2")
     )
 
@@ -158,6 +166,46 @@ def validate_required_columns(df: DataFrame, dataset_name: str) -> None:
     missing_columns = sorted(REQUIRED_COLUMNS[dataset_name] - set(df.columns))
     if missing_columns:
         raise ValueError(f"{dataset_name} is missing required columns: {', '.join(missing_columns)}")
+
+
+def reject_rows(df: DataFrame, predicate: F.Column, message: str, keys: list[str]) -> None:
+    """Fail before writing any outputs; show keys without exposing financial payloads."""
+    examples = df.filter(predicate).select(*keys).limit(5).collect()
+    if examples:
+        raise ValueError(f"{message}; example keys: {[row.asDict() for row in examples]}")
+
+
+def deduplicate_records(df: DataFrame, keys: list[str], dataset_name: str) -> DataFrame:
+    """Exact repeats are harmless; conflicting business keys have no arbitrary winner."""
+    distinct = df.dropDuplicates()
+    conflicts = distinct.groupBy(*keys).count().filter(F.col("count") > 1)
+    reject_rows(conflicts, F.lit(True), f"{dataset_name}: conflicting records", keys)
+    return distinct
+
+
+def validate_numeric_inputs(
+    df: DataFrame, columns: list[str], dataset_name: str, keys: list[str],
+    positive: tuple[str, ...] = (), nonnegative: tuple[str, ...] = (),
+) -> None:
+    invalid = []
+    for column in columns:
+        value = F.expr(f"try_cast(`{column}` as double)")
+        supplied = F.col(column).isNotNull() & (F.trim(F.col(column).cast("string")) != "")
+        bad = value.isNull() | F.isnan(value) | (F.abs(value) == float("inf"))
+        if column in positive:
+            bad = bad | (value <= 0)
+        if column in nonnegative:
+            bad = bad | (value < 0)
+        if column == "volume":
+            bad = bad | (value >= float(2**63))
+        invalid.append(supplied & bad)
+    reject_rows(df, reduce(lambda a, b: a | b, invalid),
+                f"{dataset_name}: invalid numeric value in {', '.join(columns)}", keys)
+
+
+def validate_company_references(df: DataFrame, companies: DataFrame, dataset_name: str) -> None:
+    unknown = df.join(companies.select("company_id"), "company_id", "left_anti")
+    reject_rows(unknown, F.lit(True), f"{dataset_name}: unknown company_id", ["company_id"])
 
 
 def normalize_sector(column_name: str) -> F.Column:
@@ -184,50 +232,48 @@ def prepare_companies(raw_companies: DataFrame) -> DataFrame:
             normalize_sector("sector").alias("sector"),
             F.trim(F.col("industry")).alias("industry"),
             F.trim(F.col("country")).alias("country"),
-            F.to_date("listing_date").alias("listing_date"),
+            F.expr("try_cast(listing_date as date)").alias("listing_date"),
         )
-        .dropDuplicates(["company_id"])
         .fillna({"industry": "Unknown Industry", "country": "Unknown"})
-        .filter(F.col("company_id").isNotNull())
     )
-
-    invalid_sectors = companies.filter(~F.lower(F.col("sector")).isin(*VALID_SECTORS.keys())).count()
-    if invalid_sectors:
-        raise ValueError("Companies dataset contains sector values outside the expected controlled list.")
-
-    return companies
+    reject_rows(companies,
+                F.col("company_id").isNull() | F.col("sector").isNull()
+                | ~F.lower("sector").isin(*VALID_SECTORS)
+                | F.col("ticker").isNull() | (F.col("ticker") == "")
+                | F.col("company_name").isNull() | (F.col("company_name") == "")
+                | F.col("listing_date").isNull(),
+                "companies: invalid required value", ["company_id"])
+    return deduplicate_records(companies, ["company_id"], "companies")
 
 
 def prepare_daily_prices(raw_daily_prices: DataFrame, companies: DataFrame) -> DataFrame:
     validate_required_columns(raw_daily_prices, "daily_prices")
+    validate_numeric_inputs(raw_daily_prices, ["close_price", "volume"], "daily_prices",
+                            ["company_id", "date"], positive=("close_price",), nonnegative=("volume",))
 
     casted = (
         raw_daily_prices.select(
             F.col("company_id").cast("int").alias("company_id"),
-            F.to_date("date").alias("date"),
+            F.expr("try_cast(date as date)").alias("date"),
             F.col("close_price").cast("double").alias("close_price"),
             F.col("volume").cast("double").alias("volume"),
         )
-        .dropDuplicates(["company_id", "date"])
-        .filter(F.col("company_id").isNotNull() & F.col("date").isNotNull())
     )
+    reject_rows(casted, F.col("company_id").isNull() | F.col("date").isNull(),
+                "daily_prices: invalid company_id/date", ["company_id", "date"])
+    casted = deduplicate_records(casted, ["company_id", "date"], "daily_prices")
+    validate_company_references(casted, companies, "daily_prices")
 
     company_window = Window.partitionBy("company_id").orderBy("date")
     previous_rows = company_window.rowsBetween(Window.unboundedPreceding, Window.currentRow)
-    next_rows = company_window.rowsBetween(Window.currentRow, Window.unboundedFollowing)
-    company_partition = Window.partitionBy("company_id")
-
     cleaned = (
-        casted.withColumn("close_price_forward_fill", F.last("close_price", ignorenulls=True).over(previous_rows))
-        .withColumn("close_price_backward_fill", F.first("close_price", ignorenulls=True).over(next_rows))
-        .withColumn(
-            "close_price",
-            F.coalesce("close_price", "close_price_forward_fill", "close_price_backward_fill"),
-        )
-        .withColumn("company_average_volume", F.avg("volume").over(company_partition))
-        .withColumn("volume", F.coalesce("volume", "company_average_volume"))
-        .drop("close_price_forward_fill", "close_price_backward_fill", "company_average_volume")
+        casted.withColumn("close_price", F.last("close_price", ignorenulls=True).over(previous_rows))
+        .withColumn("volume", F.coalesce("volume", F.avg("volume").over(previous_rows)))
     )
+    # A leading missing close cannot satisfy the price contract without future data.
+    reject_rows(cleaned, F.col("close_price").isNull(),
+                "daily_prices: missing close_price without an observed past price",
+                ["company_id", "date"])
 
     featured = (
         cleaned.withColumn("previous_close_price", F.lag("close_price").over(company_window))
@@ -255,7 +301,7 @@ def prepare_daily_prices(raw_daily_prices: DataFrame, companies: DataFrame) -> D
             "industry",
             "country",
             "date",
-            F.round("close_price", 4).alias("close_price"),
+            "close_price",
             F.round("volume", 0).cast("bigint").alias("volume"),
             F.round("daily_return", 8).alias("daily_return"),
             F.round("moving_average_20d", 4).alias("moving_average_20d"),
@@ -279,37 +325,49 @@ def prepare_quarterly_fundamentals(raw_fundamentals: DataFrame, companies: DataF
         "equity",
         "operating_cash_flow",
     ]
+    validate_numeric_inputs(raw_fundamentals, numeric_columns, "quarterly_fundamentals",
+                            ["company_id", "fiscal_quarter"],
+                            nonnegative=("total_assets", "total_liabilities"))
+    reject_rows(raw_fundamentals,
+                F.col("fiscal_quarter").isNull()
+                | ~F.col("fiscal_quarter").rlike(r"^[0-9]{4}-Q[1-4]$")
+                | (F.length("fiscal_quarter") != 7)
+                | (F.substring("fiscal_quarter", 1, 4) == "0000"),
+                "quarterly_fundamentals: invalid fiscal_quarter (expected YYYY-Q[1-4])",
+                ["company_id", "fiscal_quarter"])
 
     casted = (
         raw_fundamentals.select(
             F.col("company_id").cast("int").alias("company_id"),
             F.trim(F.col("fiscal_quarter")).alias("fiscal_quarter"),
+            F.expr("try_cast(available_date as date)").alias("available_date"),
             *[F.col(column).cast("double").alias(column) for column in numeric_columns],
         )
-        .dropDuplicates(["company_id", "fiscal_quarter"])
-        .filter(F.col("company_id").isNotNull() & F.col("fiscal_quarter").isNotNull())
     )
-
-    company_partition = Window.partitionBy("company_id")
-
-    prepared = casted
-    for column in numeric_columns:
-        prepared = prepared.withColumn(
-            column,
-            F.coalesce(F.col(column), F.avg(column).over(company_partition), F.lit(0.0)),
-        )
-
-    fiscal_year = F.regexp_extract("fiscal_quarter", r"(\d{4})", 1).cast("int")
-    quarter_number = F.regexp_extract("fiscal_quarter", r"Q([1-4])", 1).cast("int")
+    reject_rows(casted, F.col("company_id").isNull() | F.col("available_date").isNull(),
+                "quarterly_fundamentals: invalid company_id/available_date",
+                ["company_id", "fiscal_quarter"])
+    casted = deduplicate_records(casted, ["company_id", "fiscal_quarter"], "quarterly_fundamentals")
+    validate_company_references(casted, companies, "quarterly_fundamentals")
+    fiscal_year = F.substring("fiscal_quarter", 1, 4).cast("int")
+    quarter_number = F.substring("fiscal_quarter", 7, 1).cast("int")
 
     ordered_window = Window.partitionBy("company_id").orderBy("fiscal_quarter_start_date")
 
     featured = (
-        prepared.withColumn(
+        casted.withColumn(
             "fiscal_quarter_start_date",
             F.make_date(fiscal_year, ((quarter_number - 1) * 3) + 1, F.lit(1)),
         )
-        .withColumn("previous_quarter_revenue", F.lag("revenue").over(ordered_window))
+        .withColumn("previous_quarter_start_date", F.lag("fiscal_quarter_start_date").over(ordered_window))
+        .withColumn("lagged_revenue", F.lag("revenue").over(ordered_window))
+        .withColumn("lagged_available_date", F.lag("available_date").over(ordered_window))
+        .withColumn("previous_quarter_revenue", F.when(
+            F.col("previous_quarter_start_date") == F.add_months("fiscal_quarter_start_date", -3),
+            F.col("lagged_revenue")))
+        .withColumn("feature_available_date", F.when(
+            F.col("previous_quarter_revenue").isNotNull(),
+            F.greatest("available_date", "lagged_available_date")).otherwise(F.col("available_date")))
         .withColumn(
             "revenue_growth_qoq",
             F.when(
@@ -327,12 +385,17 @@ def prepare_quarterly_fundamentals(raw_fundamentals: DataFrame, companies: DataF
             "country",
             "fiscal_quarter",
             "fiscal_quarter_start_date",
+            "available_date",
+            "feature_available_date",
             *[F.round(column, 4).alias(column) for column in numeric_columns],
             F.round("previous_quarter_revenue", 4).alias("previous_quarter_revenue"),
             F.round("revenue_growth_qoq", 8).alias("revenue_growth_qoq"),
         )
     )
-
+    reject_rows(featured,
+                F.col("available_date") < F.last_day(F.add_months("fiscal_quarter_start_date", 2)),
+                "quarterly_fundamentals: available_date precedes quarter end",
+                ["company_id", "fiscal_quarter"])
     return featured
 
 

@@ -29,6 +29,7 @@
 | --- | --- | --- |
 | `company_id` | integer | Stable company identifier. |
 | `fiscal_quarter` | string | Fiscal quarter in `YYYY-QN` format. |
+| `available_date` | date string | Actual publication date supplied by the source; synthetic generation assumes quarter end plus 45 days. |
 | `revenue` | decimal | Quarterly revenue. |
 | `gross_profit` | decimal | Revenue minus cost of goods or service delivery. |
 | `operating_income` | decimal | Earnings from operations before non-operating items. |
@@ -69,7 +70,7 @@ Spark writes this dataset as a Parquet directory in the silver layer.
 | `date` | date | Trading date. |
 | `close_price` | decimal | Cleaned closing share price. |
 | `volume` | integer | Cleaned daily traded volume. |
-| `daily_return` | decimal | Daily percentage return based on the previous close. |
+| `daily_return` | double | Fractional simple return based on the previous close: `0.01` means 1%. |
 | `moving_average_20d` | decimal | Rolling 20-trading-day average close price. |
 | `rolling_volatility_20d` | decimal | Rolling 20-trading-day standard deviation of daily returns. |
 
@@ -87,6 +88,8 @@ Spark writes this dataset as a Parquet directory in the silver layer.
 | `country` | string | Country joined from the company dimension. |
 | `fiscal_quarter` | string | Fiscal quarter in `YYYY-QN` format. |
 | `fiscal_quarter_start_date` | date | First day of the fiscal quarter, derived in Spark. |
+| `available_date` | date | Publication date of this quarter's fundamentals, never earlier than period end. |
+| `feature_available_date` | date | Latest publication date of this report and any consecutive prior-quarter revenue used by growth. |
 | `revenue` | decimal | Quarterly revenue after missing-value treatment. |
 | `gross_profit` | decimal | Quarterly gross profit after missing-value treatment. |
 | `operating_income` | decimal | Quarterly operating income after missing-value treatment. |
@@ -155,3 +158,17 @@ Key fields:
 - `average_rolling_volatility_20d`
 - `next_quarter_revenue_growth_qoq`
 - `next_quarter_growth_flag`
+- `feature_available_date`
+- `next_quarter_outcome_available_date`
+- `is_training_eligible`
+
+## Units and financial conventions
+
+- Synthetic share prices and financial statements use a common illustrative USD unit, regardless of listing country. No currency conversion or real exchange calendar is modeled. Volumes count shares.
+- Financial measures and ratios are stored as floating-point doubles, not exact accounting decimals. Zeros are observed zeros; NULL means unavailable. Fundamentals are not imputed. Division by zero returns NULL.
+- Margins and growth are fractions, not percentage points. Gross, operating, net and cash-flow margins divide the respective quarterly flow by quarterly revenue.
+- `debt_to_equity` uses **total liabilities / closing equity**, a broad liabilities-to-equity measure rather than interest-bearing debt alone. `liabilities_to_assets` uses total liabilities / closing assets.
+- Return on assets is quarterly net income / quarter-end assets; asset turnover is quarterly revenue / quarter-end assets. Neither is annualized, and neither uses average balance-sheet values.
+- Sector metrics are equal-weight arithmetic averages of non-NULL company metrics. They are not revenue-weighted ratios of summed financial statements. `average_daily_return` is an arithmetic average, not a compounded quarterly return.
+- Rolling windows use up to 20 observations including the current day, with partial windows at the beginning of history. Volatility is the sample standard deviation of daily returns, not annualized volatility.
+- Unknown terminal/gapped next-quarter outcomes and their flags remain NULL. Known positive growth has flag 1; known zero/negative growth has flag 0. Feature rows remain in the mart; training eligibility additionally requires that the outcome became available after the features.

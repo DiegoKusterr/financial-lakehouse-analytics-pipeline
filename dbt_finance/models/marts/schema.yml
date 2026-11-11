@@ -74,6 +74,19 @@ models:
                 to: ref('stg_companies')
                 field: company_id
       - name: next_quarter_growth_flag
-        description: Simple future-growth label derived for supervised learning experiments.
+        description: One for positive next-quarter growth, zero for known nonpositive growth, NULL for an unknown outcome.
+        tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
+      - name: feature_available_date
+        description: Earliest date all fundamental inputs to this row are available; market inputs end at the represented quarter end.
+        tests:
+          - not_null
+      - name: next_quarter_outcome_available_date
+        description: Date the known consecutive-quarter growth outcome becomes available; NULL when unknown.
+      - name: is_training_eligible
+        description: Known consecutive-quarter label available strictly after the feature date; feature missingness still needs a model-specific policy.
         tests:
           - not_null

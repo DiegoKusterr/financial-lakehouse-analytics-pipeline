@@ -8,6 +8,8 @@ select
     country,
     fiscal_quarter,
     fiscal_quarter_start_date,
+    available_date,
+    feature_available_date,
     revenue,
     gross_profit,
     operating_income,

@@ -102,6 +102,18 @@ models:
         description: Quarterly revenue after missing-value treatment.
         tests:
           - not_null
+      - name: fiscal_quarter_start_date
+        description: Validated calendar-quarter start; this synthetic dataset uses calendar fiscal quarters.
+        tests:
+          - not_null
+      - name: available_date
+        description: Source publication date; synthetic generation assumes quarter end plus 45 days.
+        tests:
+          - not_null
+      - name: feature_available_date
+        description: Latest publication date of the current and any previous-quarter revenue used by this feature row.
+        tests:
+          - not_null
       - name: sector
         description: Sector inherited from the company dimension.
         tests:

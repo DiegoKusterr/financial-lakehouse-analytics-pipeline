@@ -96,12 +96,18 @@ DuckDB is used as the execution engine for dbt. It can read Parquet directly and
 
 - standardize `ticker` values to uppercase
 - standardize `sector` values to a controlled list
-- fill missing price and fundamentals values with transparent rules
+- forward-fill prices from observed history only; reject leading missing prices rather than use future observations
+- fill missing volume from the trailing average of observed volumes, preserving NULL when there is no history
+- preserve missing fundamentals as NULL, including wholly missing measures
+- reject malformed/non-finite numeric inputs and conflicting business keys with diagnostics
+- require explicit publication dates and expose the latest input availability as `feature_available_date`
 - compute `daily_return`
 - compute `moving_average_20d`
 - compute `rolling_volatility_20d`
 - compute `previous_quarter_revenue`
 - compute `revenue_growth_qoq`
+
+Quarter identifiers must match `YYYY-Q[1-4]`. Revenue lag/growth and future labels require consecutive calendar quarters. Exact duplicate rows are removed; conflicting records abort ETL before silver writes. The synthetic dataset uses calendar fiscal quarters and assumes publication 45 days after period end. Actual inputs must supply actual publication dates; no restatement/version history is modeled. A feature row is usable only on or after its availability date.
 
 ### dbt Transformations
 
@@ -117,4 +123,7 @@ DuckDB is used as the execution engine for dbt. It can read Parquet directly and
 Validation happens in two places:
 
 - dbt schema tests confirm key quality rules for staged, intermediate, and mart models.
-- `src/validate_outputs.py` confirms that expected silver datasets, gold Parquet marts, and DuckDB relations exist after a full run.
+- `src/validate_outputs.py` scans actual Parquet contents, queries DuckDB marts, compares their contents to gold Parquet, and reconciles counts against distinct keys in the raw inputs.
+- Python regression fixtures exercise Spark cleaning, windows, temporal availability, conflicting duplicates and the real SQL label/ratio transformations.
+
+ML feature rows retain unknown outcomes as NULL. `is_training_eligible` requires a known consecutive-quarter outcome published strictly after feature availability. It does not guarantee complete predictor values or replace time-aware train/test splitting. Target and outcome metadata columns must be excluded from predictors.
